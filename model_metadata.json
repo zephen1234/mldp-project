@@ -1,21 +1,21 @@
 {
-  "trained_at_utc": "2026-07-28T19:59:04.613745+00:00",
+  "trained_at_utc": "2026-07-29T06:01:47.202768+00:00",
   "training_rows": 14986,
   "testing_rows": 3747,
   "dataset_rows": 18733,
   "data_year_min": 2017,
   "data_year_max": 2025,
   "best_parameters": {
-    "n_estimators": 300,
+    "n_estimators": 200,
     "max_depth": 20,
-    "min_samples_split": 2
+    "min_samples_split": 5
   },
   "metrics": {
-    "train_mae": 11465.215809256506,
-    "test_mae": 26817.500336103625,
-    "test_mse": 1494312302.2316496,
-    "test_rmse": 38656.33586142962,
-    "test_r2": 0.9756246580606984
+    "train_mae": 14223.261716854237,
+    "test_mae": 26756.732544632592,
+    "test_mse": 1495815886.984524,
+    "test_rmse": 38675.779074047416,
+    "test_r2": 0.9756001314658017
   },
   "towns": [
     "ANG MO KIO",

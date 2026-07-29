@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
-from sklearn.compose import ColumnTransformer
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.utils.validation import check_is_fitted
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -35,10 +36,68 @@ MODEL_FEATURES = CATEGORICAL_FEATURES + NUMERICAL_FEATURES
 TARGET = "resale_price"
 
 BEST_PARAMETERS = {
-    "n_estimators": 300,
+    "n_estimators": 200,
     "max_depth": 20,
-    "min_samples_split": 2,
+    "min_samples_split": 5,
 }
+
+
+class PandasDummyEncoder(BaseEstimator, TransformerMixin):
+    """Apply the lecture's pd.get_dummies method consistently.
+
+    Categories and output columns are learned from the training set during
+    fit. Test and prediction data are then aligned to those same columns,
+    preventing column mismatches and avoiding train-test leakage.
+    """
+
+    def __init__(self, categorical_features: list[str] | None = None):
+        self.categorical_features = categorical_features
+
+    def fit(self, features: pd.DataFrame, target=None):
+        frame = features.copy()
+        categorical_features = list(self.categorical_features or [])
+        missing = [
+            column
+            for column in categorical_features
+            if column not in frame.columns
+        ]
+        if missing:
+            raise ValueError(
+                f"Categorical columns not found: {', '.join(missing)}"
+            )
+
+        self.categories_ = {
+            column: sorted(frame[column].dropna().astype(str).unique())
+            for column in categorical_features
+        }
+        encoded = self._encode(frame)
+        self.feature_names_out_ = encoded.columns.to_list()
+        return self
+
+    def transform(self, features: pd.DataFrame) -> pd.DataFrame:
+        check_is_fitted(self, ["categories_", "feature_names_out_"])
+        encoded = self._encode(features.copy())
+        return encoded.reindex(
+            columns=self.feature_names_out_,
+            fill_value=0.0,
+        )
+
+    def get_feature_names_out(self, input_features=None) -> np.ndarray:
+        check_is_fitted(self, "feature_names_out_")
+        return np.asarray(self.feature_names_out_, dtype=object)
+
+    def _encode(self, frame: pd.DataFrame) -> pd.DataFrame:
+        for column, categories in self.categories_.items():
+            frame[column] = pd.Categorical(
+                frame[column].astype(str),
+                categories=categories,
+            )
+        return pd.get_dummies(
+            frame,
+            columns=list(self.categories_),
+            drop_first=True,
+            dtype=float,
+        )
 
 
 def convert_lease_to_years(lease: str) -> float:
@@ -93,16 +152,7 @@ def prepare_data(data_path: Path = DATA_PATH) -> pd.DataFrame:
 
 def build_tuned_pipeline() -> Pipeline:
     """Create the tuned Random Forest pipeline selected in the notebook."""
-    preprocessor = ColumnTransformer(
-        transformers=[
-            (
-                "categorical",
-                OneHotEncoder(handle_unknown="ignore"),
-                CATEGORICAL_FEATURES,
-            ),
-            ("numerical", "passthrough", NUMERICAL_FEATURES),
-        ]
-    )
+    preprocessor = PandasDummyEncoder(CATEGORICAL_FEATURES)
 
     model = RandomForestRegressor(
         random_state=42,
