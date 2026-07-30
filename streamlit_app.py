@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import math
 from calendar import month_name
 from pathlib import Path
 
@@ -406,6 +407,7 @@ with st.container(border=True):
             max_value=float(metadata["floor_area_max"]),
             value=90.0,
             step=1.0,
+            help="Enter the floor area shown in the property listing.",
             on_change=clear_prediction,
         )
 
@@ -425,6 +427,7 @@ with st.container(border=True):
             max_value=float(metadata["lease_years_max"]),
             value=min(75.0, float(metadata["lease_years_max"])),
             step=0.25,
+            help="Enter the remaining lease shown in the property listing.",
             on_change=clear_prediction,
         )
 
@@ -475,22 +478,32 @@ if predict_clicked:
             columns=model_bundle["model_features"],
         )
 
-        # 4. Apply the training columns, then 5. predict with model.pkl.
-        processed_input = prepare_input(raw_input, model_bundle)
-        predicted_price = float(
-            model_bundle["model"].predict(processed_input)[0]
-        )
+        try:
+            # 4. Apply the training columns, then 5. predict with model.pkl.
+            processed_input = prepare_input(raw_input, model_bundle)
+            predicted_price = float(
+                model_bundle["model"].predict(processed_input)[0]
+            )
 
-        st.session_state["prediction"] = {
-            "price": predicted_price,
-            "town": town,
-            "street": street,
-            "flat_type": flat_type,
-            "floor_area": floor_area,
-            "median": metadata["market_medians"].get(
-                f"{town}|{flat_type}"
-            ),
-        }
+            if not math.isfinite(predicted_price) or predicted_price <= 0:
+                raise ValueError("The model returned an invalid price.")
+        except Exception:
+            st.session_state.pop("prediction", None)
+            st.error(
+                "We could not calculate an estimate for these details. "
+                "Please check your selections and try again."
+            )
+        else:
+            st.session_state["prediction"] = {
+                "price": predicted_price,
+                "town": town,
+                "street": street,
+                "flat_type": flat_type,
+                "floor_area": floor_area,
+                "median": metadata["market_medians"].get(
+                    f"{town}|{flat_type}"
+                ),
+            }
 
 
 result = st.session_state.get("prediction")
