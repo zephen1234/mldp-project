@@ -1,20 +1,15 @@
-"""Buyer-friendly Streamlit interface for the HDB resale price model."""
-
 from __future__ import annotations
 
 import html
-import json
 from calendar import month_name
+from pathlib import Path
 
 import joblib
 import pandas as pd
 import streamlit as st
 
-from model_utils import MODEL_FEATURES, PROJECT_DIR, storey_midpoint
 
-
-MODEL_PATH = PROJECT_DIR / "hdb_price_pipeline.joblib"
-METADATA_PATH = PROJECT_DIR / "model_metadata.json"
+MODEL_PATH = Path(__file__).with_name("model.pkl")
 
 
 st.set_page_config(
@@ -33,16 +28,14 @@ st.markdown(
             --brand: #08786d;
             --brand-dark: #075f57;
             --mint: #e8f6f1;
-            --warm: #fff5e8;
-            --gold: #d88a26;
+            --warm: #fff3df;
             --line: #d9e8e3;
-            --white: #ffffff;
         }
 
         .stApp {
             background:
-                radial-gradient(circle at 95% 3%, #dff4ed 0, transparent 25rem),
-                radial-gradient(circle at 4% 42%, #fff1dd 0, transparent 22rem),
+                radial-gradient(circle at 95% 4%, #dff4ed 0, transparent 25rem),
+                radial-gradient(circle at 4% 50%, #fff1dd 0, transparent 22rem),
                 #fbfdfc;
             color: var(--ink);
         }
@@ -58,71 +51,65 @@ st.markdown(
 
         .block-container {
             max-width: 1040px;
-            padding-top: 1.5rem;
-            padding-bottom: 3.5rem;
+            padding-top: 1.4rem;
+            padding-bottom: 3rem;
         }
 
         .trust-strip {
             display: flex;
             justify-content: center;
-            gap: 0.7rem;
+            gap: 0.65rem;
             flex-wrap: wrap;
-            margin-bottom: 1rem;
+            margin-bottom: 0.9rem;
         }
 
         .trust-pill {
             border: 1px solid var(--line);
-            background: rgba(255, 255, 255, 0.82);
+            background: rgba(255, 255, 255, 0.88);
             border-radius: 999px;
             color: var(--muted);
             font-size: 0.78rem;
             font-weight: 650;
-            padding: 0.42rem 0.75rem;
+            padding: 0.42rem 0.72rem;
         }
 
         .hero {
-            position: relative;
             overflow: hidden;
-            background: linear-gradient(130deg, #083f3a 0%, #08786d 75%);
-            border-radius: 28px;
+            background: linear-gradient(130deg, #083f3a 0%, #08786d 78%);
+            border-radius: 26px;
             color: white;
-            padding: 2.5rem 2.7rem;
-            box-shadow: 0 22px 55px rgba(8, 75, 68, 0.17);
-            margin-bottom: 1.5rem;
+            padding: 2.35rem 2.55rem;
+            box-shadow: 0 20px 48px rgba(8, 75, 68, 0.17);
+            margin-bottom: 1.45rem;
         }
 
-        .hero::after {
-            content: "";
-            position: absolute;
-            width: 260px;
-            height: 260px;
-            border-radius: 50%;
-            right: -90px;
-            top: -115px;
-            background: rgba(255, 255, 255, 0.08);
-        }
-
-        .hero-kicker {
-            color: #bce8df;
+        .hero-kicker,
+        .eyebrow,
+        .result-label,
+        .insight-label {
             font-size: 0.75rem;
             font-weight: 800;
-            letter-spacing: 0.13em;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
-            margin-bottom: 0.65rem;
+        }
+
+        .hero-kicker,
+        .result-label {
+            color: #bce8df;
         }
 
         .hero h1 {
             color: white;
-            font-size: clamp(2.1rem, 5vw, 3.55rem);
+            font-size: clamp(2.1rem, 5vw, 3.45rem);
             letter-spacing: -0.045em;
-            line-height: 1.03;
-            margin: 0 0 0.75rem;
+            line-height: 1.04;
+            margin: 0.55rem 0 0.7rem;
             max-width: 720px;
         }
 
         .hero p {
             color: #e1f5f0;
-            font-size: 1.08rem;
+            font-size: 1.05rem;
             line-height: 1.55;
             max-width: 680px;
             margin: 0;
@@ -130,107 +117,65 @@ st.markdown(
 
         .form-intro {
             text-align: center;
-            margin: 1.8rem auto 1.1rem;
-            max-width: 650px;
+            margin: 1.6rem auto 1rem;
         }
 
         .eyebrow {
             color: var(--brand);
-            font-size: 0.75rem;
-            font-weight: 800;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            margin-bottom: 0.35rem;
         }
 
-        .form-intro h2,
-        .section-heading h2 {
+        .form-intro h2 {
             color: var(--ink);
             letter-spacing: -0.025em;
-            margin: 0;
+            margin: 0.3rem 0 0;
         }
 
-        .form-intro p,
-        .section-heading p {
+        .form-intro p {
             color: var(--muted);
-            margin: 0.45rem 0 0;
+            margin: 0.4rem 0 0;
         }
 
         div[data-testid="stVerticalBlockBorderWrapper"] {
-            background: rgba(255, 255, 255, 0.88);
+            background: rgba(255, 255, 255, 0.9);
             border: 1px solid var(--line) !important;
-            border-radius: 24px;
-            box-shadow: 0 14px 38px rgba(22, 48, 44, 0.07);
-        }
-
-        .step-title {
-            display: flex;
-            align-items: center;
-            gap: 0.55rem;
-            color: var(--ink);
-            font-weight: 750;
-            margin: 0.1rem 0 0.65rem;
-        }
-
-        .step-number {
-            display: inline-grid;
-            place-items: center;
-            width: 1.7rem;
-            height: 1.7rem;
-            border-radius: 50%;
-            background: var(--mint);
-            color: var(--brand);
-            font-size: 0.8rem;
-            font-weight: 850;
+            border-radius: 22px;
+            box-shadow: 0 12px 32px rgba(22, 48, 44, 0.07);
         }
 
         div[data-testid="stButton"] button {
-            min-height: 3.35rem;
+            min-height: 3.25rem;
             border: 0 !important;
             border-radius: 15px;
             background: var(--brand) !important;
             color: white !important;
             font-size: 1rem;
-            font-weight: 760;
-            box-shadow: 0 10px 24px rgba(8, 120, 109, 0.22);
+            font-weight: 750;
+            box-shadow: 0 9px 22px rgba(8, 120, 109, 0.22);
         }
 
-        div[data-testid="stButton"] button:hover,
-        div[data-testid="stButton"] button:focus,
-        div[data-testid="stButton"] button:active {
+        div[data-testid="stButton"] button:hover {
             background: var(--brand-dark) !important;
-            color: white !important;
-            transform: translateY(-1px);
         }
 
         .result-card {
             background: linear-gradient(135deg, #083f3a 0%, #08786d 100%);
             color: white;
-            border-radius: 26px;
-            padding: 2rem 2.2rem;
-            box-shadow: 0 20px 50px rgba(8, 75, 68, 0.19);
+            border-radius: 25px;
+            padding: 1.9rem 2.1rem;
+            box-shadow: 0 18px 45px rgba(8, 75, 68, 0.19);
             margin: 1.2rem 0 1rem;
         }
 
-        .result-label {
-            color: #bce8df;
-            font-size: 0.75rem;
-            font-weight: 800;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-        }
-
         .result-price {
-            font-size: clamp(2.65rem, 7vw, 4.8rem);
+            font-size: clamp(2.7rem, 7vw, 4.7rem);
             font-weight: 850;
             letter-spacing: -0.055em;
             line-height: 1.03;
-            margin: 0.35rem 0 0.55rem;
+            margin: 0.3rem 0 0.5rem;
         }
 
         .result-property {
             color: #e1f5f0;
-            font-size: 0.95rem;
             margin: 0;
         }
 
@@ -238,29 +183,25 @@ st.markdown(
             height: 100%;
             border: 1px solid var(--line);
             border-radius: 20px;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.92);
             padding: 1.15rem 1.2rem;
         }
 
         .insight-label {
             color: var(--muted);
-            font-size: 0.75rem;
-            font-weight: 750;
-            letter-spacing: 0.07em;
-            text-transform: uppercase;
-            margin-bottom: 0.45rem;
+            margin-bottom: 0.4rem;
         }
 
         .insight-value {
             color: var(--ink);
-            font-size: 1.28rem;
+            font-size: 1.25rem;
             font-weight: 790;
-            line-height: 1.25;
+            line-height: 1.3;
         }
 
         .insight-note {
             color: var(--muted);
-            font-size: 0.82rem;
+            font-size: 0.84rem;
             line-height: 1.45;
             margin-top: 0.35rem;
         }
@@ -282,63 +223,25 @@ st.markdown(
 
         .comparison-warm {
             color: #995a0b;
-            background: #fff0d8;
-        }
-
-        .section-heading {
-            margin: 2rem 0 0.85rem;
-        }
-
-        .action-card {
-            min-height: 150px;
-            border: 1px solid var(--line);
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 1.15rem 1.2rem;
-        }
-
-        .action-icon {
-            font-size: 1.25rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .action-title {
-            color: var(--ink);
-            font-weight: 790;
-            margin-bottom: 0.3rem;
-        }
-
-        .action-copy {
-            color: var(--muted);
-            font-size: 0.86rem;
-            line-height: 1.48;
-        }
-
-        .small-print {
-            color: var(--muted);
-            font-size: 0.82rem;
-            line-height: 1.55;
+            background: var(--warm);
         }
 
         .footer {
             color: var(--muted);
             text-align: center;
             font-size: 0.8rem;
-            margin-top: 1.6rem;
+            margin-top: 1.5rem;
         }
 
         @media (max-width: 700px) {
             .block-container {
-                padding-top: 0.8rem;
+                padding-top: 0.7rem;
             }
 
-            .hero {
-                padding: 1.7rem;
-                border-radius: 21px;
-            }
-
+            .hero,
             .result-card {
                 padding: 1.55rem;
+                border-radius: 20px;
             }
         }
     </style>
@@ -347,66 +250,76 @@ st.markdown(
 )
 
 
+# 1. Load the trained model, matching the lecture deployment workflow.
 @st.cache_resource(show_spinner="Preparing your price estimator...")
-def load_artifacts() -> tuple[object, dict]:
-    """Load the trained model and buyer-interface metadata."""
-    if not MODEL_PATH.exists() or not METADATA_PATH.exists():
-        raise FileNotFoundError(
-            "Model files are missing. Run `python train_model.py` once."
-        )
+def load_model() -> dict:
+    if not MODEL_PATH.exists() or MODEL_PATH.stat().st_size == 0:
+        raise FileNotFoundError("model.pkl is missing or empty.")
 
-    model = joblib.load(MODEL_PATH)
-    metadata = json.loads(METADATA_PATH.read_text(encoding="utf-8"))
-    return model, metadata
+    bundle = joblib.load(MODEL_PATH)
+    required_keys = {
+        "model",
+        "feature_names",
+        "categories",
+        "categorical_features",
+        "model_features",
+        "metadata",
+    }
+    if not required_keys.issubset(bundle):
+        raise ValueError("model.pkl does not contain the required model data.")
+    return bundle
 
 
 def format_currency(value: float) -> str:
     return f"S${value:,.0f}"
 
 
+def storey_midpoint(storey_range: str) -> float:
+    lower, _, upper = storey_range.split()
+    return (float(lower) + float(upper)) / 2
+
+
+def prepare_input(raw_input: pd.DataFrame, bundle: dict) -> pd.DataFrame:
+    """Apply the same pandas categorical conversion used during training."""
+    processed = raw_input.copy()
+
+    for column in bundle["categorical_features"]:
+        processed[column] = pd.Categorical(
+            processed[column].astype(str),
+            categories=bundle["categories"][column],
+        )
+
+    processed = pd.get_dummies(
+        processed,
+        columns=bundle["categorical_features"],
+        drop_first=True,
+        dtype=float,
+    )
+    return processed.reindex(
+        columns=bundle["feature_names"],
+        fill_value=0.0,
+    )
+
+
 def clear_prediction() -> None:
-    """Clear the old result whenever a buyer changes an input."""
-    st.session_state.pop("prediction_result", None)
-
-
-def validate_inputs(
-    town: str | None,
-    flat_type: str | None,
-    street_name: str | None,
-    flat_model: str | None,
-    storey_range: str | None,
-) -> list[str]:
-    """Return short, buyer-friendly validation messages."""
-    required_values = {
-        "town": town,
-        "street": street_name,
-        "flat type": flat_type,
-        "flat model": flat_model,
-        "storey range": storey_range,
-    }
-    return [
-        label
-        for label, value in required_values.items()
-        if value is None
-    ]
+    st.session_state.pop("prediction", None)
 
 
 try:
-    prediction_model, model_metadata = load_artifacts()
+    model_bundle = load_model()
 except Exception as error:
-    st.error(f"Unable to load the price estimator. {error}")
-    st.info("Run `python train_model.py`, then restart Streamlit.")
+    st.error(f"Unable to load the trained model: {error}")
     st.stop()
 
-
-latest_year = int(model_metadata["data_year_max"])
-latest_month = int(model_metadata.get("data_month_max", 5))
+metadata = model_bundle["metadata"]
+latest_year = int(metadata["data_year_max"])
+latest_month = int(metadata["data_month_max"])
 latest_period = f"{month_name[latest_month]} {latest_year}"
 
 st.markdown(
     f"""
     <div class="trust-strip">
-        <span class="trust-pill">✓ {model_metadata['dataset_rows']:,} transactions</span>
+        <span class="trust-pill">✓ {metadata['dataset_rows']:,} transactions</span>
         <span class="trust-pill">✓ Updated through {latest_period}</span>
         <span class="trust-pill">✓ Ang Mo Kio · Bishan · Toa Payoh</span>
     </div>
@@ -414,8 +327,8 @@ st.markdown(
         <div class="hero-kicker">HDB resale price guide</div>
         <h1>Know your price range before making an offer.</h1>
         <p>
-            Get a quick, data-backed estimate for a resale flat and use it
-            as a starting point for your buying decision.
+            Get a quick, data-backed estimate and use it as a starting
+            point when comparing resale flats.
         </p>
     </section>
     """,
@@ -425,74 +338,56 @@ st.markdown(
 st.markdown(
     """
     <div class="form-intro">
-        <div class="eyebrow">Takes about one minute</div>
+        <div class="eyebrow">Property details</div>
         <h2>Tell us about the flat</h2>
-        <p>Use the details shown in the property listing.</p>
+        <p>Use the information shown in the property listing.</p>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
+# 2. Collect user inputs.
 with st.container(border=True):
-    st.markdown(
-        '<div class="step-title"><span class="step-number">1</span>'
-        "Where is the flat?</div>",
-        unsafe_allow_html=True,
-    )
-
-    location_one, location_two = st.columns(2, gap="large")
-    with location_one:
+    location_left, location_right = st.columns(2, gap="large")
+    with location_left:
         town = st.selectbox(
-            "Town",
-            options=model_metadata["towns"],
+            "Town *",
+            metadata["towns"],
             index=None,
             placeholder="Choose a town",
             on_change=clear_prediction,
         )
 
-    with location_two:
-        street_options = (
-            model_metadata["streets_by_town"].get(town, [])
-            if town
-            else []
-        )
-        street_name = st.selectbox(
-            "Street",
-            options=street_options,
+    with location_right:
+        streets = metadata["streets_by_town"].get(town, []) if town else []
+        street = st.selectbox(
+            "Street *",
+            streets,
             index=None,
-            placeholder=(
-                "Choose a street" if town else "Select a town first"
-            ),
+            placeholder="Choose a street" if town else "Select a town first",
             disabled=town is None,
             on_change=clear_prediction,
         )
 
-    st.write("")
-    st.markdown(
-        '<div class="step-title"><span class="step-number">2</span>'
-        "What type of flat is it?</div>",
-        unsafe_allow_html=True,
-    )
-
-    type_one, type_two = st.columns(2, gap="large")
-    with type_one:
+    type_left, type_right = st.columns(2, gap="large")
+    with type_left:
         flat_type = st.selectbox(
-            "Flat type",
-            options=model_metadata["flat_types"],
+            "Flat type *",
+            metadata["flat_types"],
             index=None,
             placeholder="Choose a flat type",
             on_change=clear_prediction,
         )
 
-    with type_two:
-        flat_model_options = (
-            model_metadata["flat_models_by_flat_type"].get(flat_type, [])
+    with type_right:
+        flat_models = (
+            metadata["flat_models_by_flat_type"].get(flat_type, [])
             if flat_type
             else []
         )
         flat_model = st.selectbox(
-            "Flat model",
-            options=flat_model_options,
+            "Flat model *",
+            flat_models,
             index=None,
             placeholder=(
                 "Choose a flat model"
@@ -500,83 +395,75 @@ with st.container(border=True):
                 else "Select a flat type first"
             ),
             disabled=flat_type is None,
-            help="Examples include Improved, Model A and New Generation.",
             on_change=clear_prediction,
         )
 
-    st.write("")
-    st.markdown(
-        '<div class="step-title"><span class="step-number">3</span>'
-        "Add the key details</div>",
-        unsafe_allow_html=True,
-    )
-
-    detail_one, detail_two, detail_three = st.columns(3, gap="medium")
-    with detail_one:
+    detail_left, detail_middle, detail_right = st.columns(3, gap="medium")
+    with detail_left:
         floor_area = st.number_input(
             "Floor area (m²)",
-            min_value=float(model_metadata["floor_area_min"]),
-            max_value=float(model_metadata["floor_area_max"]),
+            min_value=float(metadata["floor_area_min"]),
+            max_value=float(metadata["floor_area_max"]),
             value=90.0,
             step=1.0,
-            help="Use the floor area stated in the listing.",
             on_change=clear_prediction,
         )
 
-    with detail_two:
+    with detail_middle:
         storey_range = st.selectbox(
-            "Storey range",
-            options=model_metadata["storey_ranges"],
+            "Storey range *",
+            metadata["storey_ranges"],
             index=None,
             placeholder="Choose a range",
             on_change=clear_prediction,
         )
 
-    with detail_three:
+    with detail_right:
         lease_years = st.number_input(
             "Remaining lease (years)",
-            min_value=float(model_metadata["lease_years_min"]),
-            max_value=float(model_metadata["lease_years_max"]),
-            value=min(75.0, float(model_metadata["lease_years_max"])),
+            min_value=float(metadata["lease_years_min"]),
+            max_value=float(metadata["lease_years_max"]),
+            value=min(75.0, float(metadata["lease_years_max"])),
             step=0.25,
-            help="Example: 74 years 6 months is 74.5 years.",
             on_change=clear_prediction,
         )
 
-    st.write("")
-    button_left, button_centre, button_right = st.columns([1, 1.35, 1])
-    with button_centre:
-        estimate_clicked = st.button(
+    button_left, button_middle, button_right = st.columns([1, 1.35, 1])
+    with button_middle:
+        predict_clicked = st.button(
             "Show my price estimate",
             type="primary",
-            width="stretch",
+            use_container_width=True,
         )
+
     st.caption(
-        f"The estimate uses the latest model period ({latest_period}). "
-        "It is a guide, not an official valuation."
+        f"Uses the latest model period ({latest_period}). "
+        "Required selections are marked with *."
     )
 
 
-if estimate_clicked:
-    missing_inputs = validate_inputs(
-        town=town,
-        flat_type=flat_type,
-        street_name=street_name,
-        flat_model=flat_model,
-        storey_range=storey_range,
-    )
+if predict_clicked:
+    required_values = {
+        "town": town,
+        "street": street,
+        "flat type": flat_type,
+        "flat model": flat_model,
+        "storey range": storey_range,
+    }
+    missing = [
+        label for label, value in required_values.items() if value is None
+    ]
 
-    if missing_inputs:
-        st.error(
-            "Please complete: " + ", ".join(missing_inputs) + "."
-        )
+    if missing:
+        st.error("Please complete: " + ", ".join(missing) + ".")
     else:
-        prediction_input = pd.DataFrame(
+        # 3. Convert the selected values into a one-row DataFrame.
+        raw_input = pd.DataFrame(
             [
                 {
                     "town": town,
                     "flat_type": flat_type,
-                    "street_name": street_name,
+                    "street_name": street,
                     "flat_model": flat_model,
                     "floor_area_sqm": floor_area,
                     "remaining_lease_years": lease_years,
@@ -585,68 +472,59 @@ if estimate_clicked:
                     "sale_month": latest_month,
                 }
             ],
-            columns=MODEL_FEATURES,
+            columns=model_bundle["model_features"],
         )
 
-        try:
-            predicted_price = float(
-                prediction_model.predict(prediction_input)[0]
-            )
-            median_key = f"{town}|{flat_type}"
-            market_median = model_metadata["market_medians"].get(median_key)
+        # 4. Apply the training columns, then 5. predict with model.pkl.
+        processed_input = prepare_input(raw_input, model_bundle)
+        predicted_price = float(
+            model_bundle["model"].predict(processed_input)[0]
+        )
 
-            st.session_state["prediction_result"] = {
-                "price": predicted_price,
-                "market_median": market_median,
-                "town": town,
-                "street": street_name,
-                "flat_type": flat_type,
-                "flat_model": flat_model,
-                "floor_area": floor_area,
-                "storey_range": storey_range,
-                "lease_years": lease_years,
-            }
-        except Exception:
-            st.error(
-                "The estimate could not be generated. Please check the "
-                "details and try again."
-            )
+        st.session_state["prediction"] = {
+            "price": predicted_price,
+            "town": town,
+            "street": street,
+            "flat_type": flat_type,
+            "floor_area": floor_area,
+            "median": metadata["market_medians"].get(
+                f"{town}|{flat_type}"
+            ),
+        }
 
 
-prediction_result = st.session_state.get("prediction_result")
-if prediction_result is not None:
-    predicted_price = prediction_result["price"]
-    typical_error = float(model_metadata["metrics"]["test_mae"])
-    lower_estimate = max(0, predicted_price - typical_error)
-    upper_estimate = predicted_price + typical_error
-
-    property_summary = (
-        f"{html.escape(prediction_result['flat_type'])} · "
-        f"{prediction_result['floor_area']:.0f} m² · "
-        f"{html.escape(prediction_result['street'])}"
-    )
+result = st.session_state.get("prediction")
+if result:
+    price = float(result["price"])
+    typical_error = float(metadata["metrics"]["test_mae"])
+    lower_price = max(0, price - typical_error)
+    upper_price = price + typical_error
 
     st.markdown(
         f"""
         <section class="result-card">
             <div class="result-label">Estimated resale price</div>
-            <div class="result-price">{format_currency(predicted_price)}</div>
-            <p class="result-property">{property_summary}</p>
+            <div class="result-price">{format_currency(price)}</div>
+            <p class="result-property">
+                {html.escape(result['flat_type'])} ·
+                {result['floor_area']:.0f} m² ·
+                {html.escape(result['street'])}
+            </p>
         </section>
         """,
         unsafe_allow_html=True,
     )
 
-    market_median = prediction_result["market_median"]
-    if market_median is None:
-        comparison_label = "Market comparison unavailable"
-        comparison_value = "Not enough recent comparable data"
-        comparison_note = "Use recent nearby transactions as a reference."
+    median = result["median"]
+    if median is None:
         comparison_class = "comparison-warm"
+        comparison_label = "Comparison unavailable"
+        comparison_value = "Check recent nearby transactions"
+        comparison_note = "There is not enough recent comparable data."
     else:
-        difference = predicted_price - market_median
-        difference_percentage = difference / market_median * 100
-        if abs(difference_percentage) <= 5:
+        difference = price - float(median)
+        percentage = difference / float(median) * 100
+        if abs(percentage) <= 5:
             comparison_label = "Close to recent median"
             comparison_class = "comparison-good"
         elif difference > 0:
@@ -662,30 +540,29 @@ if prediction_result is not None:
         )
         comparison_note = (
             f"Compared with the {latest_year} median for "
-            f"{prediction_result['flat_type']} flats in "
-            f"{prediction_result['town']}."
+            f"{result['flat_type']} flats in {result['town']}."
         )
 
-    insight_one, insight_two = st.columns(2, gap="medium")
-    with insight_one:
+    insight_left, insight_right = st.columns(2, gap="medium")
+    with insight_left:
         st.markdown(
             f"""
             <div class="insight-card">
                 <div class="insight-label">Buyer planning range</div>
                 <div class="insight-value">
-                    {format_currency(lower_estimate)} –
-                    {format_currency(upper_estimate)}
+                    {format_currency(lower_price)} –
+                    {format_currency(upper_price)}
                 </div>
                 <div class="insight-note">
-                    A practical guide using the model's typical test error.
-                    It is not a guaranteed sale-price range.
+                    Uses the model's typical test error. This is not a
+                    guaranteed transaction-price range.
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-    with insight_two:
+    with insight_right:
         st.markdown(
             f"""
             <div class="insight-card">
@@ -697,99 +574,26 @@ if prediction_result is not None:
             unsafe_allow_html=True,
         )
 
-    st.markdown(
-        """
-        <div class="section-heading">
-            <div class="eyebrow">Before you make an offer</div>
-            <h2>Three useful next steps</h2>
-            <p>The model is a starting point. Complete these checks before deciding.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    action_one, action_two, action_three = st.columns(3, gap="medium")
-    with action_one:
-        st.markdown(
-            """
-            <div class="action-card">
-                <div class="action-icon">🔎</div>
-                <div class="action-title">Check recent transactions</div>
-                <div class="action-copy">
-                    Compare similar flats on the same street and nearby blocks,
-                    especially recent sales with a similar floor area.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with action_two:
-        st.markdown(
-            """
-            <div class="action-card">
-                <div class="action-icon">💰</div>
-                <div class="action-title">Confirm your full budget</div>
-                <div class="action-copy">
-                    Check financing, valuation, renovation and transaction
-                    costs before deciding what you can comfortably offer.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with action_three:
-        st.markdown(
-            """
-            <div class="action-card">
-                <div class="action-icon">🏡</div>
-                <div class="action-title">Inspect what data misses</div>
-                <div class="action-copy">
-                    Consider condition, orientation, noise, view and nearby
-                    amenities because these are not included in the model.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
     with st.expander("How reliable is this estimate?"):
-        reliability_one, reliability_two = st.columns(2)
-        with reliability_one:
-            st.markdown("**What supports the estimate**")
-            st.write(
-                f"Trained on {model_metadata['dataset_rows']:,} cleaned "
-                f"transactions from {model_metadata['data_year_min']} to "
-                f"{latest_period}."
-            )
-            st.write(
-                "The model's typical test error is approximately "
-                f"{format_currency(typical_error)}."
-            )
-
-        with reliability_two:
-            st.markdown("**What the model cannot see**")
-            st.write(
-                "Renovation quality, unit condition, exact orientation, "
-                "noise, views, policy changes and interest rates."
-            )
-            st.write(
-                "Use the result for early research, not as an official "
-                "valuation or financial recommendation."
-            )
-
+        st.write(
+            f"The tuned Random Forest was tested on "
+            f"{metadata['testing_rows']:,} unseen transactions. Its typical "
+            f"test error was approximately {format_currency(typical_error)}."
+        )
+        st.write(
+            "The model cannot assess renovation, unit condition, exact "
+            "orientation, views, noise, policy changes or interest rates."
+        )
         st.caption(
-            "Technical reference: "
-            f"test R² {model_metadata['metrics']['test_r2']:.4f} · "
-            f"test RMSE "
-            f"{format_currency(model_metadata['metrics']['test_rmse'])}"
+            f"Test R²: {metadata['metrics']['test_r2']:.4f} · "
+            f"Test RMSE: "
+            f"{format_currency(metadata['metrics']['test_rmse'])}"
         )
 
 st.markdown(
     """
     <div class="footer">
-        HDB Price Compass · A student machine-learning decision-support project
+        HDB Price Compass · Student machine-learning decision-support project
     </div>
     """,
     unsafe_allow_html=True,
