@@ -1,10 +1,11 @@
 {
-  "trained_at_utc": "2026-07-29T06:01:47.202768+00:00",
+  "trained_at_utc": "2026-07-30T03:48:55.600733+00:00",
   "training_rows": 14986,
   "testing_rows": 3747,
   "dataset_rows": 18733,
   "data_year_min": 2017,
   "data_year_max": 2025,
+  "data_month_max": 5,
   "best_parameters": {
     "n_estimators": 200,
     "max_depth": 20,

@@ -62,6 +62,7 @@ def main() -> None:
 
     recent_year = int(dataframe["sale_year"].max())
     recent_data = dataframe[dataframe["sale_year"] == recent_year]
+    recent_month = int(recent_data["sale_month"].max())
     market_medians = (
         recent_data.groupby(["town", "flat_type"])[TARGET]
         .median()
@@ -75,6 +76,7 @@ def main() -> None:
         "dataset_rows": int(len(dataframe)),
         "data_year_min": int(dataframe["sale_year"].min()),
         "data_year_max": recent_year,
+        "data_month_max": recent_month,
         "best_parameters": BEST_PARAMETERS,
         "metrics": {
             "train_mae": float(train_mae),
