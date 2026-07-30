@@ -86,8 +86,7 @@ st.markdown(
 
         .hero-kicker,
         .eyebrow,
-        .result-label,
-        .insight-label {
+        .result-label {
             font-size: 0.75rem;
             font-weight: 800;
             letter-spacing: 0.12em;
@@ -178,53 +177,6 @@ st.markdown(
         .result-property {
             color: #e1f5f0;
             margin: 0;
-        }
-
-        .insight-card {
-            height: 100%;
-            border: 1px solid var(--line);
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.92);
-            padding: 1.15rem 1.2rem;
-        }
-
-        .insight-label {
-            color: var(--muted);
-            margin-bottom: 0.4rem;
-        }
-
-        .insight-value {
-            color: var(--ink);
-            font-size: 1.25rem;
-            font-weight: 790;
-            line-height: 1.3;
-        }
-
-        .insight-note {
-            color: var(--muted);
-            font-size: 0.84rem;
-            line-height: 1.45;
-            margin-top: 0.35rem;
-        }
-
-        .comparison-good,
-        .comparison-warm {
-            display: inline-block;
-            border-radius: 999px;
-            padding: 0.28rem 0.65rem;
-            font-size: 0.76rem;
-            font-weight: 800;
-            margin-bottom: 0.4rem;
-        }
-
-        .comparison-good {
-            color: #08665d;
-            background: #dff5ee;
-        }
-
-        .comparison-warm {
-            color: #995a0b;
-            background: var(--warm);
         }
 
         .footer {
@@ -500,18 +452,12 @@ if predict_clicked:
                 "street": street,
                 "flat_type": flat_type,
                 "floor_area": floor_area,
-                "median": metadata["market_medians"].get(
-                    f"{town}|{flat_type}"
-                ),
             }
 
 
 result = st.session_state.get("prediction")
 if result:
     price = float(result["price"])
-    typical_error = float(metadata["metrics"]["test_mae"])
-    lower_price = max(0, price - typical_error)
-    upper_price = price + typical_error
 
     st.markdown(
         f"""
@@ -527,81 +473,6 @@ if result:
         """,
         unsafe_allow_html=True,
     )
-
-    median = result["median"]
-    if median is None:
-        comparison_class = "comparison-warm"
-        comparison_label = "Comparison unavailable"
-        comparison_value = "Check recent nearby transactions"
-        comparison_note = "There is not enough recent comparable data."
-    else:
-        difference = price - float(median)
-        percentage = difference / float(median) * 100
-        if abs(percentage) <= 5:
-            comparison_label = "Close to recent median"
-            comparison_class = "comparison-good"
-        elif difference > 0:
-            comparison_label = "Above recent median"
-            comparison_class = "comparison-warm"
-        else:
-            comparison_label = "Below recent median"
-            comparison_class = "comparison-good"
-
-        comparison_value = (
-            f"{format_currency(abs(difference))} "
-            f"{'higher' if difference > 0 else 'lower'}"
-        )
-        comparison_note = (
-            f"Compared with the {latest_year} median for "
-            f"{result['flat_type']} flats in {result['town']}."
-        )
-
-    insight_left, insight_right = st.columns(2, gap="medium")
-    with insight_left:
-        st.markdown(
-            f"""
-            <div class="insight-card">
-                <div class="insight-label">Buyer planning range</div>
-                <div class="insight-value">
-                    {format_currency(lower_price)} –
-                    {format_currency(upper_price)}
-                </div>
-                <div class="insight-note">
-                    Uses the model's typical test error. This is not a
-                    guaranteed transaction-price range.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with insight_right:
-        st.markdown(
-            f"""
-            <div class="insight-card">
-                <div class="{comparison_class}">{comparison_label}</div>
-                <div class="insight-value">{comparison_value}</div>
-                <div class="insight-note">{comparison_note}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with st.expander("How reliable is this estimate?"):
-        st.write(
-            f"The tuned Random Forest was tested on "
-            f"{metadata['testing_rows']:,} unseen transactions. Its typical "
-            f"test error was approximately {format_currency(typical_error)}."
-        )
-        st.write(
-            "The model cannot assess renovation, unit condition, exact "
-            "orientation, views, noise, policy changes or interest rates."
-        )
-        st.caption(
-            f"Test R²: {metadata['metrics']['test_r2']:.4f} · "
-            f"Test RMSE: "
-            f"{format_currency(metadata['metrics']['test_rmse'])}"
-        )
 
 st.markdown(
     """
