@@ -11,6 +11,7 @@ import streamlit as st
 
 
 MODEL_PATH = Path(__file__).with_name("model.pkl")
+DATA_PATH = Path(__file__).with_name("hdb.csv")
 
 
 st.set_page_config(
@@ -234,13 +235,35 @@ def load_model() -> dict:
         "floor_area_max",
         "lease_years_min",
         "lease_years_max",
-        "valid_profiles",
     }
     if not required_metadata_keys.issubset(bundle["metadata"]):
         raise ValueError(
             "model.pkl does not contain the required deployment metadata."
         )
     return bundle
+
+
+@st.cache_data
+def load_floor_area_limits() -> dict:
+    hdb_data = pd.read_csv(DATA_PATH)
+    limits = {}
+
+    for flat_type, floor_areas in hdb_data.groupby("flat_type")[
+        "floor_area_sqm"
+    ]:
+        q1 = floor_areas.quantile(0.25)
+        q3 = floor_areas.quantile(0.75)
+        iqr = q3 - q1
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        valid_areas = floor_areas.between(lower_bound, upper_bound)
+
+        limits[flat_type] = {
+            "min": float(floor_areas[valid_areas].min()),
+            "max": float(floor_areas[valid_areas].max()),
+        }
+
+    return limits
 
 
 def format_currency(value: float) -> str:
@@ -280,8 +303,9 @@ def clear_prediction() -> None:
 
 try:
     model_bundle = load_model()
+    floor_area_limits = load_floor_area_limits()
 except Exception as error:
-    st.error(f"Unable to load the trained model: {error}")
+    st.error(f"Unable to load the required project data: {error}")
     st.stop()
 
 metadata = model_bundle["metadata"]
@@ -429,40 +453,21 @@ if predict_clicked:
         label for label, value in required_values.items() if value is None
     ]
 
-    profile = None
-    if not missing:
-        profile_key = "|||".join(
-            [town, street, flat_type, flat_model, storey_range]
-        )
-        profile = metadata["valid_profiles"].get(profile_key)
-
     if missing:
         st.error("Please complete: " + ", ".join(missing) + ".")
-    elif profile is None:
+    elif flat_type not in floor_area_limits:
         st.error(
-            "This combination of town, street, flat type, flat model, "
-            "and storey range was not represented in the training data. "
-            "Please choose a supported combination."
+            "The selected flat type was not found in the project dataset."
         )
     elif not (
-        profile["floor_area_min"]
+        floor_area_limits[flat_type]["min"]
         <= floor_area
-        <= profile["floor_area_max"]
+        <= floor_area_limits[flat_type]["max"]
     ):
         st.error(
-            "For this property combination, floor area must be between "
-            f"{profile['floor_area_min']:.0f} and "
-            f"{profile['floor_area_max']:.0f} m²."
-        )
-    elif not (
-        profile["lease_years_min"]
-        <= lease_years
-        <= profile["lease_years_max"]
-    ):
-        st.error(
-            "For this property combination, remaining lease must be "
-            f"between {profile['lease_years_min']:.2f} and "
-            f"{profile['lease_years_max']:.2f} years."
+            f"A {flat_type} flat in this dataset has a floor area between "
+            f"{floor_area_limits[flat_type]['min']:.0f} and "
+            f"{floor_area_limits[flat_type]['max']:.0f} m²."
         )
     else:
         # 3. Convert the selected values into a one-row DataFrame.
