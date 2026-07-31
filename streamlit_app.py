@@ -220,6 +220,26 @@ def load_model() -> dict:
     }
     if not required_keys.issubset(bundle):
         raise ValueError("model.pkl does not contain the required model data.")
+
+    required_metadata_keys = {
+        "data_year_max",
+        "data_month_max",
+        "dataset_rows",
+        "towns",
+        "streets_by_town",
+        "flat_types",
+        "flat_models_by_flat_type",
+        "storey_ranges",
+        "floor_area_min",
+        "floor_area_max",
+        "lease_years_min",
+        "lease_years_max",
+        "valid_profiles",
+    }
+    if not required_metadata_keys.issubset(bundle["metadata"]):
+        raise ValueError(
+            "model.pkl does not contain the required deployment metadata."
+        )
     return bundle
 
 
@@ -409,8 +429,41 @@ if predict_clicked:
         label for label, value in required_values.items() if value is None
     ]
 
+    profile = None
+    if not missing:
+        profile_key = "|||".join(
+            [town, street, flat_type, flat_model, storey_range]
+        )
+        profile = metadata["valid_profiles"].get(profile_key)
+
     if missing:
         st.error("Please complete: " + ", ".join(missing) + ".")
+    elif profile is None:
+        st.error(
+            "This combination of town, street, flat type, flat model, "
+            "and storey range was not represented in the training data. "
+            "Please choose a supported combination."
+        )
+    elif not (
+        profile["floor_area_min"]
+        <= floor_area
+        <= profile["floor_area_max"]
+    ):
+        st.error(
+            "For this property combination, floor area must be between "
+            f"{profile['floor_area_min']:.0f} and "
+            f"{profile['floor_area_max']:.0f} m²."
+        )
+    elif not (
+        profile["lease_years_min"]
+        <= lease_years
+        <= profile["lease_years_max"]
+    ):
+        st.error(
+            "For this property combination, remaining lease must be "
+            f"between {profile['lease_years_min']:.2f} and "
+            f"{profile['lease_years_max']:.2f} years."
+        )
     else:
         # 3. Convert the selected values into a one-row DataFrame.
         raw_input = pd.DataFrame(
